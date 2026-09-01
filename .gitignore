@@ -1,0 +1,19 @@
+# build output
+build/
+dbengine
+unit_tests
+*.o
+*.dSYM/
+
+# db files generated at runtime / by tests
+data/
+*.tbl
+*.db
+*.dat
+tests/tmp_data/
+
+# os / editor cruft
+.DS_Store
+*.swp
+*.swo
+*~

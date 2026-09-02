@@ -1,9 +1,10 @@
 // simple-database-from-scratch
-// entry point for the repl. right now this is just a skeleton that
-// reads lines and prints them back - real parsing comes next.
+// entry point for the repl.
 
 #include <iostream>
 #include <string>
+
+#include "parser.h"
 
 int main(int argc, char** argv) {
     (void)argc;
@@ -17,13 +18,21 @@ int main(int argc, char** argv) {
         if (!std::getline(std::cin, line)) {
             break;
         }
-        if (line == "EXIT" || line == "exit") {
-            break;
-        }
-        if (line.empty()) {
+
+        Statement stmt = parseStatement(line);
+
+        if (stmt.type == StatementType::EMPTY) {
             continue;
         }
-        std::cout << "not implemented yet: " << line << std::endl;
+        if (stmt.type == StatementType::EXIT) {
+            break;
+        }
+        if (stmt.type == StatementType::PARSE_ERROR) {
+            std::cout << "error: " << stmt.errorMessage << std::endl;
+            continue;
+        }
+
+        std::cout << "recognized statement, execution not wired up yet" << std::endl;
     }
 
     return 0;

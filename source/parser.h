@@ -1,6 +1,9 @@
 #pragma once
 
 #include <string>
+#include <vector>
+
+#include "value.h"
 
 // the kinds of statements our tiny sql dialect understands.
 // PARSE_ERROR means we couldn't make sense of the input at all.
@@ -14,11 +17,19 @@ enum class StatementType {
     PARSE_ERROR
 };
 
+struct ColumnDef {
+    std::string name;
+    ColumnType type;
+};
+
 // this will grow as we add real fields for each statement kind.
-// for now it's just enough to tell the repl what kind of line it saw.
 struct Statement {
     StatementType type = StatementType::PARSE_ERROR;
     std::string errorMessage;
+
+    // CREATE TABLE
+    std::string tableName;
+    std::vector<ColumnDef> columns;
 };
 
 Statement parseStatement(const std::string& line);

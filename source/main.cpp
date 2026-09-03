@@ -4,11 +4,16 @@
 #include <iostream>
 #include <string>
 
+#include "database.h"
 #include "parser.h"
 
 int main(int argc, char** argv) {
-    (void)argc;
-    (void)argv;
+    std::string dataDir = "data";
+    if (argc > 1) {
+        dataDir = argv[1];
+    }
+
+    Database db(dataDir);
 
     std::cout << "simple db engine - type EXIT to quit" << std::endl;
 
@@ -32,7 +37,7 @@ int main(int argc, char** argv) {
             continue;
         }
 
-        std::cout << "recognized statement, execution not wired up yet" << std::endl;
+        std::cout << db.execute(stmt) << std::endl;
     }
 
     return 0;

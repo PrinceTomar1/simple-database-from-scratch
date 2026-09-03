@@ -14,6 +14,87 @@ std::string toUpper(const std::string& s) {
     return out;
 }
 
+// CREATE TABLE <name> ( <col> <TYPE>, <col> <TYPE>, ... )
+// tokens[0] is the CREATE keyword we already consumed conceptually.
+Statement parseCreateTable(const std::vector<Token>& tokens) {
+    Statement stmt;
+
+    size_t pos = 1; // skip CREATE
+    if (pos >= tokens.size() || tokens[pos].type != TokenType::IDENTIFIER ||
+        toUpper(tokens[pos].text) != "TABLE") {
+        stmt.errorMessage = "malformed command: expected TABLE after CREATE";
+        return stmt;
+    }
+    pos++;
+
+    if (pos >= tokens.size() || tokens[pos].type != TokenType::IDENTIFIER) {
+        stmt.errorMessage = "malformed command: expected a table name after TABLE";
+        return stmt;
+    }
+    stmt.tableName = tokens[pos].text;
+    pos++;
+
+    if (pos >= tokens.size() || tokens[pos].type != TokenType::SYMBOL || tokens[pos].text != "(") {
+        stmt.errorMessage = "malformed command: expected '(' after table name";
+        return stmt;
+    }
+    pos++;
+
+    bool expectMore = true;
+    while (expectMore) {
+        if (pos >= tokens.size() || tokens[pos].type != TokenType::IDENTIFIER) {
+            stmt.errorMessage = "malformed command: expected a column name";
+            return stmt;
+        }
+        std::string colName = tokens[pos].text;
+        pos++;
+
+        if (pos >= tokens.size() || tokens[pos].type != TokenType::IDENTIFIER) {
+            stmt.errorMessage = "malformed command: expected a type for column '" + colName + "'";
+            return stmt;
+        }
+        bool ok = false;
+        ColumnType colType = columnTypeFromString(tokens[pos].text, ok);
+        if (!ok) {
+            stmt.errorMessage = "malformed command: unknown type '" + tokens[pos].text +
+                                 "' (only INTEGER and TEXT are supported)";
+            return stmt;
+        }
+        pos++;
+
+        stmt.columns.push_back({colName, colType});
+
+        if (pos >= tokens.size() || tokens[pos].type != TokenType::SYMBOL) {
+            stmt.errorMessage = "malformed command: expected ',' or ')' after column definition";
+            return stmt;
+        }
+        if (tokens[pos].text == ",") {
+            pos++;
+            continue;
+        }
+        if (tokens[pos].text == ")") {
+            pos++;
+            expectMore = false;
+            continue;
+        }
+        stmt.errorMessage = "malformed command: expected ',' or ')' after column definition";
+        return stmt;
+    }
+
+    if (stmt.columns.empty()) {
+        stmt.errorMessage = "malformed command: a table needs at least one column";
+        return stmt;
+    }
+
+    if (pos < tokens.size() && tokens[pos].type != TokenType::END) {
+        stmt.errorMessage = "malformed command: unexpected input after ')'";
+        return stmt;
+    }
+
+    stmt.type = StatementType::CREATE_TABLE;
+    return stmt;
+}
+
 } // namespace
 
 // this is still a skeleton - it just figures out which statement kind
@@ -57,7 +138,11 @@ Statement parseStatement(const std::string& line) {
         return stmt;
     }
 
-    if (keyword == "CREATE" || keyword == "INSERT" || keyword == "SELECT" || keyword == "DELETE") {
+    if (keyword == "CREATE") {
+        return parseCreateTable(tokens);
+    }
+
+    if (keyword == "INSERT" || keyword == "SELECT" || keyword == "DELETE") {
         // real parsing for these lands in later commits. for now we just
         // acknowledge we recognize the shape of the command.
         stmt.type = StatementType::PARSE_ERROR;

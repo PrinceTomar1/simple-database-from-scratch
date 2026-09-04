@@ -18,10 +18,15 @@ public:
 
     const std::string& name() const { return tableName; }
     const std::vector<ColumnDef>& schema() const { return columnDefs; }
+    const std::vector<Row>& allRows() const { return rows; }
 
     int findColumnIndex(const std::string& colName) const;
+
+    // returns an error message on failure, empty string on success.
+    std::string insertRow(const std::vector<Value>& values);
 
 private:
     std::string tableName;
     std::vector<ColumnDef> columnDefs;
+    std::vector<Row> rows;
 };

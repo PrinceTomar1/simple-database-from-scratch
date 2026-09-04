@@ -30,6 +30,9 @@ struct Statement {
     // CREATE TABLE
     std::string tableName;
     std::vector<ColumnDef> columns;
+
+    // INSERT
+    std::vector<Value> values;
 };
 
 Statement parseStatement(const std::string& line);

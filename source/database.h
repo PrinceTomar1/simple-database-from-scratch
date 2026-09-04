@@ -20,4 +20,5 @@ private:
     std::unordered_map<std::string, Table> tables;
 
     std::string doCreateTable(const Statement& stmt);
+    std::string doInsert(const Statement& stmt);
 };

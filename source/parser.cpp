@@ -170,6 +170,41 @@ Statement parseInsert(const std::vector<Token>& tokens) {
     return stmt;
 }
 
+// SELECT * FROM <name>
+// (WHERE support gets added later)
+Statement parseSelect(const std::vector<Token>& tokens) {
+    Statement stmt;
+
+    size_t pos = 1; // skip SELECT
+    if (pos >= tokens.size() || tokens[pos].type != TokenType::SYMBOL || tokens[pos].text != "*") {
+        stmt.errorMessage = "malformed command: expected '*' after SELECT (only SELECT * is supported)";
+        return stmt;
+    }
+    pos++;
+
+    if (pos >= tokens.size() || tokens[pos].type != TokenType::IDENTIFIER ||
+        toUpper(tokens[pos].text) != "FROM") {
+        stmt.errorMessage = "malformed command: expected FROM after SELECT *";
+        return stmt;
+    }
+    pos++;
+
+    if (pos >= tokens.size() || tokens[pos].type != TokenType::IDENTIFIER) {
+        stmt.errorMessage = "malformed command: expected a table name after FROM";
+        return stmt;
+    }
+    stmt.tableName = tokens[pos].text;
+    pos++;
+
+    if (pos < tokens.size() && tokens[pos].type != TokenType::END) {
+        stmt.errorMessage = "malformed command: unexpected input after table name";
+        return stmt;
+    }
+
+    stmt.type = StatementType::SELECT;
+    return stmt;
+}
+
 } // namespace
 
 // this is still a skeleton - it just figures out which statement kind
@@ -221,9 +256,12 @@ Statement parseStatement(const std::string& line) {
         return parseInsert(tokens);
     }
 
-    if (keyword == "SELECT" || keyword == "DELETE") {
-        // real parsing for these lands in later commits. for now we just
-        // acknowledge we recognize the shape of the command.
+    if (keyword == "SELECT") {
+        return parseSelect(tokens);
+    }
+
+    if (keyword == "DELETE") {
+        // real parsing for this lands in a later commit.
         stmt.type = StatementType::PARSE_ERROR;
         stmt.errorMessage = "malformed command: " + keyword + " is not fully implemented yet";
         return stmt;

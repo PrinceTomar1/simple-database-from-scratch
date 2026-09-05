@@ -1,6 +1,40 @@
 #include "database.h"
 
+#include <sstream>
+
 Database::Database(std::string dataDir) : dataDir(std::move(dataDir)) {}
+
+namespace {
+
+// renders rows as a plain header + one line per row, space separated.
+// nothing fancy - no column alignment, just something readable.
+std::string formatResult(const Table& table, const std::vector<const Row*>& rows) {
+    std::ostringstream out;
+
+    const auto& cols = table.schema();
+    for (size_t i = 0; i < cols.size(); i++) {
+        if (i > 0) out << " | ";
+        out << cols[i].name;
+    }
+    out << "\n";
+
+    if (rows.empty()) {
+        out << "(0 rows)";
+        return out.str();
+    }
+
+    for (const Row* row : rows) {
+        for (size_t i = 0; i < row->values.size(); i++) {
+            if (i > 0) out << " | ";
+            out << row->values[i].toDisplayString();
+        }
+        out << "\n";
+    }
+    out << "(" << rows.size() << (rows.size() == 1 ? " row)" : " rows)");
+    return out.str();
+}
+
+} // namespace
 
 std::string Database::doCreateTable(const Statement& stmt) {
     if (tables.find(stmt.tableName) != tables.end()) {
@@ -23,12 +57,27 @@ std::string Database::doInsert(const Statement& stmt) {
     return "1 row inserted";
 }
 
+std::string Database::doSelect(const Statement& stmt) {
+    auto it = tables.find(stmt.tableName);
+    if (it == tables.end()) {
+        return "error: unknown table '" + stmt.tableName + "'";
+    }
+
+    std::vector<const Row*> rows;
+    for (const Row& row : it->second.allRows()) {
+        rows.push_back(&row);
+    }
+    return formatResult(it->second, rows);
+}
+
 std::string Database::execute(const Statement& stmt) {
     switch (stmt.type) {
         case StatementType::CREATE_TABLE:
             return doCreateTable(stmt);
         case StatementType::INSERT:
             return doInsert(stmt);
+        case StatementType::SELECT:
+            return doSelect(stmt);
         default:
             return "error: statement not supported yet";
     }

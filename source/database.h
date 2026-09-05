@@ -21,4 +21,5 @@ private:
 
     std::string doCreateTable(const Statement& stmt);
     std::string doInsert(const Statement& stmt);
+    std::string doSelect(const Statement& stmt);
 };

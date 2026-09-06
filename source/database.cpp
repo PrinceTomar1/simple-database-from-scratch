@@ -1,8 +1,23 @@
 #include "database.h"
 
+#include <iostream>
 #include <sstream>
 
+#include "storage.h"
+
 Database::Database(std::string dataDir) : dataDir(std::move(dataDir)) {}
+
+void Database::loadFromDisk() {
+    for (const std::string& tableName : listStoredTableNames(dataDir)) {
+        Table table;
+        std::string err = loadTable(dataDir, tableName, table);
+        if (!err.empty()) {
+            std::cerr << "warning: skipping table '" << tableName << "' - " << err << std::endl;
+            continue;
+        }
+        tables.emplace(tableName, std::move(table));
+    }
+}
 
 namespace {
 
@@ -40,7 +55,14 @@ std::string Database::doCreateTable(const Statement& stmt) {
     if (tables.find(stmt.tableName) != tables.end()) {
         return "error: table '" + stmt.tableName + "' already exists";
     }
-    tables.emplace(stmt.tableName, Table(stmt.tableName, stmt.columns));
+    auto result = tables.emplace(stmt.tableName, Table(stmt.tableName, stmt.columns));
+
+    std::string saveErr = saveTable(dataDir, result.first->second);
+    if (!saveErr.empty()) {
+        tables.erase(result.first);
+        return saveErr;
+    }
+
     return "table '" + stmt.tableName + "' created";
 }
 
@@ -54,6 +76,12 @@ std::string Database::doInsert(const Statement& stmt) {
     if (!err.empty()) {
         return err;
     }
+
+    std::string saveErr = saveTable(dataDir, it->second);
+    if (!saveErr.empty()) {
+        return saveErr;
+    }
+
     return "1 row inserted";
 }
 

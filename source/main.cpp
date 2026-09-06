@@ -14,8 +14,10 @@ int main(int argc, char** argv) {
     }
 
     Database db(dataDir);
+    db.loadFromDisk();
 
     std::cout << "simple db engine - type EXIT to quit" << std::endl;
+    std::cout << "using data directory: " << dataDir << std::endl;
 
     std::string line;
     while (true) {

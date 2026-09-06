@@ -13,6 +13,10 @@ class Database {
 public:
     explicit Database(std::string dataDir);
 
+    // loads any tables that were already saved to disk. call this once
+    // right after construction, before the repl starts taking commands.
+    void loadFromDisk();
+
     std::string execute(const Statement& stmt);
 
 private:

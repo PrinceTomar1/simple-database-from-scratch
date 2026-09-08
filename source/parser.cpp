@@ -248,6 +248,46 @@ Statement parseSelect(const std::vector<Token>& tokens) {
     return stmt;
 }
 
+// DELETE FROM <name> WHERE <col> = <val>
+// unlike SELECT, the WHERE clause is required here - we don't want an
+// unqualified DELETE wiping a whole table by accident.
+Statement parseDelete(const std::vector<Token>& tokens) {
+    Statement stmt;
+
+    size_t pos = 1; // skip DELETE
+    if (pos >= tokens.size() || tokens[pos].type != TokenType::IDENTIFIER ||
+        toUpper(tokens[pos].text) != "FROM") {
+        stmt.errorMessage = "malformed command: expected FROM after DELETE";
+        return stmt;
+    }
+    pos++;
+
+    if (pos >= tokens.size() || tokens[pos].type != TokenType::IDENTIFIER) {
+        stmt.errorMessage = "malformed command: expected a table name after FROM";
+        return stmt;
+    }
+    stmt.tableName = tokens[pos].text;
+    pos++;
+
+    if (pos >= tokens.size() || tokens[pos].type != TokenType::IDENTIFIER ||
+        toUpper(tokens[pos].text) != "WHERE") {
+        stmt.errorMessage = "malformed command: DELETE requires a WHERE clause "
+                             "(deleting a whole table isn't supported)";
+        return stmt;
+    }
+    if (!parseWhereClause(tokens, pos, stmt.where, stmt.errorMessage)) {
+        return stmt;
+    }
+
+    if (pos < tokens.size() && tokens[pos].type != TokenType::END) {
+        stmt.errorMessage = "malformed command: unexpected input after statement";
+        return stmt;
+    }
+
+    stmt.type = StatementType::DELETE_STMT;
+    return stmt;
+}
+
 } // namespace
 
 // this is still a skeleton - it just figures out which statement kind
@@ -304,10 +344,7 @@ Statement parseStatement(const std::string& line) {
     }
 
     if (keyword == "DELETE") {
-        // real parsing for this lands in a later commit.
-        stmt.type = StatementType::PARSE_ERROR;
-        stmt.errorMessage = "malformed command: " + keyword + " is not fully implemented yet";
-        return stmt;
+        return parseDelete(tokens);
     }
 
     stmt.type = StatementType::PARSE_ERROR;

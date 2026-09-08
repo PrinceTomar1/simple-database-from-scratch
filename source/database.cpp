@@ -107,6 +107,26 @@ std::string Database::doSelect(const Statement& stmt) {
     return formatResult(it->second, rows);
 }
 
+std::string Database::doDelete(const Statement& stmt) {
+    auto it = tables.find(stmt.tableName);
+    if (it == tables.end()) {
+        return "error: unknown table '" + stmt.tableName + "'";
+    }
+
+    size_t deletedCount = 0;
+    std::string err = it->second.deleteWhere(stmt.where, deletedCount);
+    if (!err.empty()) {
+        return err;
+    }
+
+    std::string saveErr = saveTable(dataDir, it->second);
+    if (!saveErr.empty()) {
+        return saveErr;
+    }
+
+    return std::to_string(deletedCount) + (deletedCount == 1 ? " row deleted" : " rows deleted");
+}
+
 std::string Database::execute(const Statement& stmt) {
     switch (stmt.type) {
         case StatementType::CREATE_TABLE:
@@ -115,6 +135,8 @@ std::string Database::execute(const Statement& stmt) {
             return doInsert(stmt);
         case StatementType::SELECT:
             return doSelect(stmt);
+        case StatementType::DELETE_STMT:
+            return doDelete(stmt);
         default:
             return "error: statement not supported yet";
     }

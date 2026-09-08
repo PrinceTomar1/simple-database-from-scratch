@@ -30,6 +30,11 @@ public:
     // empty string on success with matches filled in.
     std::string selectWhere(const WhereClause& where, std::vector<const Row*>& matches) const;
 
+    // deletes rows matching a WHERE clause (equality on one column).
+    // on success, outDeletedCount is set to how many rows were removed.
+    // returns an error message on failure, empty string on success.
+    std::string deleteWhere(const WhereClause& where, size_t& outDeletedCount);
+
 private:
     std::string tableName;
     std::vector<ColumnDef> columnDefs;

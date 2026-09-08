@@ -25,6 +25,11 @@ public:
     // returns an error message on failure, empty string on success.
     std::string insertRow(const std::vector<Value>& values);
 
+    // finds rows matching a WHERE clause (equality on one column).
+    // returns an error message on failure (e.g. unknown column),
+    // empty string on success with matches filled in.
+    std::string selectWhere(const WhereClause& where, std::vector<const Row*>& matches) const;
+
 private:
     std::string tableName;
     std::vector<ColumnDef> columnDefs;

@@ -92,9 +92,18 @@ std::string Database::doSelect(const Statement& stmt) {
     }
 
     std::vector<const Row*> rows;
-    for (const Row& row : it->second.allRows()) {
-        rows.push_back(&row);
+
+    if (stmt.where.present) {
+        std::string err = it->second.selectWhere(stmt.where, rows);
+        if (!err.empty()) {
+            return err;
+        }
+    } else {
+        for (const Row& row : it->second.allRows()) {
+            rows.push_back(&row);
+        }
     }
+
     return formatResult(it->second, rows);
 }
 

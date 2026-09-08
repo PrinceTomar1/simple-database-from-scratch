@@ -22,6 +22,13 @@ struct ColumnDef {
     ColumnType type;
 };
 
+// only equality on a single column is supported: WHERE col = value
+struct WhereClause {
+    bool present = false;
+    std::string column;
+    Value value;
+};
+
 // this will grow as we add real fields for each statement kind.
 struct Statement {
     StatementType type = StatementType::PARSE_ERROR;
@@ -33,6 +40,9 @@ struct Statement {
 
     // INSERT
     std::vector<Value> values;
+
+    // SELECT / DELETE
+    WhereClause where;
 };
 
 Statement parseStatement(const std::string& line);

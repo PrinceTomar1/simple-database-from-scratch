@@ -170,8 +170,44 @@ Statement parseInsert(const std::vector<Token>& tokens) {
     return stmt;
 }
 
-// SELECT * FROM <name>
-// (WHERE support gets added later)
+// parses "WHERE <col> = <val>" starting at tokens[pos] (pointing at WHERE).
+// advances pos past the whole clause. returns false and sets error on failure.
+bool parseWhereClause(const std::vector<Token>& tokens, size_t& pos, WhereClause& where,
+                       std::string& error) {
+    pos++; // skip WHERE
+
+    if (pos >= tokens.size() || tokens[pos].type != TokenType::IDENTIFIER) {
+        error = "malformed command: expected a column name after WHERE";
+        return false;
+    }
+    where.column = tokens[pos].text;
+    pos++;
+
+    if (pos >= tokens.size() || tokens[pos].type != TokenType::SYMBOL || tokens[pos].text != "=") {
+        error = "malformed command: expected '=' after column name in WHERE (only equality is supported)";
+        return false;
+    }
+    pos++;
+
+    if (pos >= tokens.size()) {
+        error = "malformed command: expected a value after '=' in WHERE";
+        return false;
+    }
+    if (tokens[pos].type == TokenType::NUMBER) {
+        where.value = Value::makeInt(std::stoll(tokens[pos].text));
+    } else if (tokens[pos].type == TokenType::STRING) {
+        where.value = Value::makeText(tokens[pos].text);
+    } else {
+        error = "malformed command: expected a number or a quoted string after '=' in WHERE";
+        return false;
+    }
+    pos++;
+
+    where.present = true;
+    return true;
+}
+
+// SELECT * FROM <name> [WHERE <col> = <val>]
 Statement parseSelect(const std::vector<Token>& tokens) {
     Statement stmt;
 
@@ -196,8 +232,15 @@ Statement parseSelect(const std::vector<Token>& tokens) {
     stmt.tableName = tokens[pos].text;
     pos++;
 
+    if (pos < tokens.size() && tokens[pos].type == TokenType::IDENTIFIER &&
+        toUpper(tokens[pos].text) == "WHERE") {
+        if (!parseWhereClause(tokens, pos, stmt.where, stmt.errorMessage)) {
+            return stmt;
+        }
+    }
+
     if (pos < tokens.size() && tokens[pos].type != TokenType::END) {
-        stmt.errorMessage = "malformed command: unexpected input after table name";
+        stmt.errorMessage = "malformed command: unexpected input after statement";
         return stmt;
     }
 

@@ -31,3 +31,26 @@ std::string Table::insertRow(const std::vector<Value>& values) {
     rows.push_back(std::move(row));
     return "";
 }
+
+std::string Table::selectWhere(const WhereClause& where, std::vector<const Row*>& matches) const {
+    int colIndex = findColumnIndex(where.column);
+    if (colIndex < 0) {
+        return "error: unknown column '" + where.column + "' on table '" + tableName + "'";
+    }
+    if (columnDefs[colIndex].type != where.value.type) {
+        return "error: type mismatch for column '" + where.column + "' (expected " +
+               columnTypeToString(columnDefs[colIndex].type) + ", got " +
+               columnTypeToString(where.value.type) + ")";
+    }
+
+    for (const Row& row : rows) {
+        const Value& cell = row.values[colIndex];
+        bool matched = (cell.type == ColumnType::INTEGER)
+                           ? (cell.intValue == where.value.intValue)
+                           : (cell.textValue == where.value.textValue);
+        if (matched) {
+            matches.push_back(&row);
+        }
+    }
+    return "";
+}

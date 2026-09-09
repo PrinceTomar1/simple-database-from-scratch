@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "parser.h"
@@ -39,4 +40,13 @@ private:
     std::string tableName;
     std::vector<ColumnDef> columnDefs;
     std::vector<Row> rows;
+
+    // a small hash index per column: value's index key -> row positions
+    // that have that value. this is what makes equality WHERE lookups
+    // fast instead of scanning every row. nothing fancy - just a map of
+    // maps, rebuilt whenever rows get removed since positions shift.
+    std::unordered_map<int, std::unordered_map<std::string, std::vector<size_t>>> columnIndexes;
+
+    void indexRow(size_t rowPos);
+    void rebuildIndexes();
 };

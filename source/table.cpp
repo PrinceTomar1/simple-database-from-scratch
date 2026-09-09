@@ -14,6 +14,20 @@ int Table::findColumnIndex(const std::string& colName) const {
     return -1;
 }
 
+void Table::indexRow(size_t rowPos) {
+    const Row& row = rows[rowPos];
+    for (size_t col = 0; col < columnDefs.size(); col++) {
+        columnIndexes[static_cast<int>(col)][row.values[col].toIndexKey()].push_back(rowPos);
+    }
+}
+
+void Table::rebuildIndexes() {
+    columnIndexes.clear();
+    for (size_t i = 0; i < rows.size(); i++) {
+        indexRow(i);
+    }
+}
+
 std::string Table::insertRow(const std::vector<Value>& values) {
     if (values.size() != columnDefs.size()) {
         return "error: table '" + tableName + "' has " + std::to_string(columnDefs.size()) +
@@ -31,6 +45,7 @@ std::string Table::insertRow(const std::vector<Value>& values) {
     Row row;
     row.values = values;
     rows.push_back(std::move(row));
+    indexRow(rows.size() - 1);
     return "";
 }
 
@@ -45,14 +60,18 @@ std::string Table::selectWhere(const WhereClause& where, std::vector<const Row*>
                columnTypeToString(where.value.type) + ")";
     }
 
-    for (const Row& row : rows) {
-        const Value& cell = row.values[colIndex];
-        bool matched = (cell.type == ColumnType::INTEGER)
-                           ? (cell.intValue == where.value.intValue)
-                           : (cell.textValue == where.value.textValue);
-        if (matched) {
-            matches.push_back(&row);
-        }
+    // hash lookup instead of scanning every row - this is the whole
+    // point of keeping the per-column index around.
+    auto colIt = columnIndexes.find(colIndex);
+    if (colIt == columnIndexes.end()) {
+        return "";
+    }
+    auto valueIt = colIt->second.find(where.value.toIndexKey());
+    if (valueIt == colIt->second.end()) {
+        return "";
+    }
+    for (size_t rowPos : valueIt->second) {
+        matches.push_back(&rows[rowPos]);
     }
     return "";
 }
@@ -79,5 +98,12 @@ std::string Table::deleteWhere(const WhereClause& where, size_t& outDeletedCount
                rows.end());
 
     outDeletedCount = before - rows.size();
+
+    // row positions shifted, so the cheapest correct thing to do is just
+    // rebuild the index from scratch. tables are small enough that this
+    // is fine.
+    if (outDeletedCount > 0) {
+        rebuildIndexes();
+    }
     return "";
 }

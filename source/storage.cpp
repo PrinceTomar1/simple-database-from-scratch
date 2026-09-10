@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <stdexcept>
 
 namespace fs = std::filesystem;
 
@@ -153,7 +154,11 @@ std::string loadTable(const std::string& dataDir, const std::string& tableName, 
         std::vector<Value> values;
         for (size_t i = 0; i < fields.size(); i++) {
             if (columns[i].type == ColumnType::INTEGER) {
-                values.push_back(Value::makeInt(std::stoll(fields[i])));
+                try {
+                    values.push_back(Value::makeInt(std::stoll(fields[i])));
+                } catch (const std::exception&) {
+                    return "error: corrupt table file '" + path + "' (bad integer '" + fields[i] + "')";
+                }
             } else {
                 values.push_back(Value::makeText(fields[i]));
             }

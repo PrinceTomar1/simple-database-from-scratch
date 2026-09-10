@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <stdexcept>
 
 #include "lexer.h"
 
@@ -12,6 +13,16 @@ std::string toUpper(const std::string& s) {
     std::transform(out.begin(), out.end(), out.begin(),
                     [](unsigned char c) { return std::toupper(c); });
     return out;
+}
+
+// wraps stoll with a friendlier error for numbers that don't fit in a
+// long long, instead of letting the raw stoll exception leak out.
+long long parseIntegerLiteral(const std::string& text) {
+    try {
+        return std::stoll(text);
+    } catch (const std::out_of_range&) {
+        throw std::runtime_error("number '" + text + "' is too large");
+    }
 }
 
 // CREATE TABLE <name> ( <col> <TYPE>, <col> <TYPE>, ... )
@@ -134,7 +145,7 @@ Statement parseInsert(const std::vector<Token>& tokens) {
             return stmt;
         }
         if (tokens[pos].type == TokenType::NUMBER) {
-            stmt.values.push_back(Value::makeInt(std::stoll(tokens[pos].text)));
+            stmt.values.push_back(Value::makeInt(parseIntegerLiteral(tokens[pos].text)));
             pos++;
         } else if (tokens[pos].type == TokenType::STRING) {
             stmt.values.push_back(Value::makeText(tokens[pos].text));
@@ -194,7 +205,7 @@ bool parseWhereClause(const std::vector<Token>& tokens, size_t& pos, WhereClause
         return false;
     }
     if (tokens[pos].type == TokenType::NUMBER) {
-        where.value = Value::makeInt(std::stoll(tokens[pos].text));
+        where.value = Value::makeInt(parseIntegerLiteral(tokens[pos].text));
     } else if (tokens[pos].type == TokenType::STRING) {
         where.value = Value::makeText(tokens[pos].text);
     } else {
@@ -331,20 +342,29 @@ Statement parseStatement(const std::string& line) {
         return stmt;
     }
 
-    if (keyword == "CREATE") {
-        return parseCreateTable(tokens);
-    }
+    // stoll (used for NUMBER tokens) can throw on something like a number
+    // literal that's too big for a long long - catch that here instead of
+    // letting it crash the whole repl.
+    try {
+        if (keyword == "CREATE") {
+            return parseCreateTable(tokens);
+        }
 
-    if (keyword == "INSERT") {
-        return parseInsert(tokens);
-    }
+        if (keyword == "INSERT") {
+            return parseInsert(tokens);
+        }
 
-    if (keyword == "SELECT") {
-        return parseSelect(tokens);
-    }
+        if (keyword == "SELECT") {
+            return parseSelect(tokens);
+        }
 
-    if (keyword == "DELETE") {
-        return parseDelete(tokens);
+        if (keyword == "DELETE") {
+            return parseDelete(tokens);
+        }
+    } catch (const std::exception& e) {
+        stmt.type = StatementType::PARSE_ERROR;
+        stmt.errorMessage = std::string("malformed command: ") + e.what();
+        return stmt;
     }
 
     stmt.type = StatementType::PARSE_ERROR;

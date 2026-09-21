@@ -24,7 +24,9 @@ EXIT
 
 Two column types: `INTEGER` and `TEXT`. That's it, on purpose - keeping
 the type system tiny meant I could spend the time on parsing/storage
-instead.
+instead. `CREATE TABLE` rejects a table with two columns of the same
+name, since that would make `WHERE`/`SELECT` ambiguous about which one
+you meant.
 
 ## Architecture
 
@@ -42,7 +44,11 @@ statement has its own straightforward left-to-right parse function
 that walks the token list and fills in a `Statement` struct. If
 anything doesn't match what's expected, parsing bails out immediately
 with a specific error message saying what it expected instead - no
-silent failures, no crashes on garbage input.
+silent failures, no crashes on garbage input. A single trailing `;` is
+tolerated (since typing one is muscle memory from real SQL clients),
+but it's dropped before parsing rather than treated as a statement
+separator - `SELECT * FROM t; SELECT * FROM t2` is still a parse
+error, not two statements.
 
 ### Tables (`source/table.*`)
 
@@ -93,7 +99,7 @@ version of that exact check in `tests/run_tests.sh`.
 
 ### Query execution (`source/database.*`)
 
-`Database` owns a `map<string, Table>` and a data directory. It takes
+`Database` owns an `unordered_map<string, Table>` and a data directory. It takes
 an already-parsed `Statement` and dispatches to a handler per
 statement type, each of which does its own validation (table exists,
 column exists, types line up, right number of values) before touching
@@ -121,7 +127,14 @@ Being upfront about the scope, since it'd be easy to overstate this:
 - **The index isn't persisted** - it's rebuilt in memory from the row
   data every time a table loads. That's cheap since tables are small,
   but it means index-build time is O(rows) on every startup.
-- **No concurrency.** Single process, single-threaded REPL.
+- **No concurrency.** Single process, single-threaded REPL. Pointing
+  two instances at the same data directory at once isn't safe - there's
+  no file locking, so whichever one saves last wins.
+- **No rollback on a failed save.** Every write goes through the
+  save-to-tmp-then-rename path, so a crash mid-write can't corrupt a
+  table file, but if the disk write itself fails (disk full, permission
+  denied), the in-memory table has already changed and the error just
+  gets reported - it doesn't undo the insert/delete in memory.
 
 ## Building
 

@@ -97,6 +97,16 @@ Statement parseCreateTable(const std::vector<Token>& tokens) {
         return stmt;
     }
 
+    for (size_t i = 0; i < stmt.columns.size(); i++) {
+        for (size_t j = i + 1; j < stmt.columns.size(); j++) {
+            if (stmt.columns[i].name == stmt.columns[j].name) {
+                stmt.errorMessage =
+                    "malformed command: column '" + stmt.columns[i].name + "' is defined twice";
+                return stmt;
+            }
+        }
+    }
+
     if (pos < tokens.size() && tokens[pos].type != TokenType::END) {
         stmt.errorMessage = "malformed command: unexpected input after ')'";
         return stmt;
@@ -301,9 +311,9 @@ Statement parseDelete(const std::vector<Token>& tokens) {
 
 } // namespace
 
-// this is still a skeleton - it just figures out which statement kind
-// we're looking at based on the first keyword. the real per-statement
-// parsing gets filled in as each command gets built out.
+// figures out which statement kind we're looking at from the first
+// keyword, then hands the token list off to that statement's own
+// left-to-right parse function.
 Statement parseStatement(const std::string& line) {
     Statement stmt;
 
@@ -327,6 +337,14 @@ Statement parseStatement(const std::string& line) {
     if (tokens.empty() || tokens[0].type == TokenType::END) {
         stmt.type = StatementType::EMPTY;
         return stmt;
+    }
+
+    // tolerate one trailing semicolon, like people habitually type in real
+    // sql clients - it carries no meaning here since a statement is always
+    // exactly one line, so it's just dropped before the real parsing.
+    if (tokens.size() >= 2 && tokens[tokens.size() - 2].type == TokenType::SYMBOL &&
+        tokens[tokens.size() - 2].text == ";") {
+        tokens.erase(tokens.end() - 2);
     }
 
     if (tokens[0].type != TokenType::IDENTIFIER) {

@@ -124,6 +124,42 @@ else
 fi
 
 # ---------------------------------------------------------------------
+# test 4: quitting via EOF (e.g. piped input just ending) instead of an
+# explicit EXIT should still leave everything persisted correctly, since
+# every statement is synced to disk as it happens.
+# ---------------------------------------------------------------------
+EOF_DIR="$TMP_ROOT/eof"
+mkdir -p "$EOF_DIR"
+
+printf 'CREATE TABLE t (id INTEGER)\nINSERT INTO t VALUES (1)' | "$BINARY" "$EOF_DIR" > /dev/null
+
+EOF_RESULT=$(printf 'SELECT * FROM t\nEXIT\n' | "$BINARY" "$EOF_DIR")
+if echo "$EOF_RESULT" | grep -qF "1"; then
+    pass "quitting via eof (no explicit EXIT) still persists what was done"
+else
+    fail "data inserted before an eof quit did not persist"
+    echo "$EOF_RESULT"
+fi
+
+# ---------------------------------------------------------------------
+# test 5: a hand-corrupted .tbl file shouldn't crash startup - it should
+# be skipped with a warning, and every other table should load fine.
+# ---------------------------------------------------------------------
+CORRUPT_DIR="$TMP_ROOT/corrupt"
+mkdir -p "$CORRUPT_DIR"
+
+printf 'CREATE TABLE good (id INTEGER)\nINSERT INTO good VALUES (1)\nEXIT\n' | "$BINARY" "$CORRUPT_DIR" > /dev/null
+echo "this is not a valid table file" > "$CORRUPT_DIR/broken.tbl"
+
+CORRUPT_OUTPUT=$("$BINARY" "$CORRUPT_DIR" <<< $'SELECT * FROM good\nSELECT * FROM broken\nEXIT' 2>&1)
+if echo "$CORRUPT_OUTPUT" | grep -qF "1" && echo "$CORRUPT_OUTPUT" | grep -qF "unknown table 'broken'"; then
+    pass "a corrupted table file is skipped with a warning instead of crashing startup"
+else
+    fail "startup didn't handle a corrupted table file gracefully"
+    echo "$CORRUPT_OUTPUT"
+fi
+
+# ---------------------------------------------------------------------
 rm -rf "$TMP_ROOT"
 
 echo ""

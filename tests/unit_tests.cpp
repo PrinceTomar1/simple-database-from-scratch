@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 
 #include "../source/database.h"
 #include "../source/lexer.h"
@@ -71,6 +72,24 @@ void test_parse_create_table_bad_type() {
     Statement stmt = parseStatement("CREATE TABLE users (id WEIRD)");
     assert(stmt.type == StatementType::PARSE_ERROR);
     assert(stmt.errorMessage.find("unknown type") != std::string::npos);
+}
+
+void test_parse_create_table_duplicate_column_rejected() {
+    Statement stmt = parseStatement("CREATE TABLE users (id INTEGER, id TEXT)");
+    assert(stmt.type == StatementType::PARSE_ERROR);
+    assert(stmt.errorMessage.find("defined twice") != std::string::npos);
+}
+
+void test_parse_tolerates_trailing_semicolon() {
+    Statement withSemi = parseStatement("SELECT * FROM users;");
+    Statement withoutSemi = parseStatement("SELECT * FROM users");
+    assert(withSemi.type == StatementType::SELECT);
+    assert(withSemi.tableName == withoutSemi.tableName);
+
+    // a semicolon isn't a statement separator - anything after it should
+    // still be a parse error, not silently accepted as two statements.
+    Statement twoStatements = parseStatement("SELECT * FROM users; SELECT * FROM other");
+    assert(twoStatements.type == StatementType::PARSE_ERROR);
 }
 
 void test_parse_insert() {
@@ -213,6 +232,31 @@ void test_storage_round_trip() {
     fs::remove_all(dir);
 }
 
+void test_storage_int64_boundary_values() {
+    std::string dir = "tests/tmp_data/storage_int64_boundary";
+    fs::remove_all(dir);
+
+    const long long maxVal = std::numeric_limits<long long>::max();
+    const long long minVal = std::numeric_limits<long long>::min();
+
+    Table table("nums", {{"id", ColumnType::INTEGER}});
+    table.insertRow({Value::makeInt(maxVal)});
+    table.insertRow({Value::makeInt(minVal)});
+    table.insertRow({Value::makeInt(0)});
+
+    std::string err = saveTable(dir, table);
+    assert(err.empty());
+
+    Table loaded;
+    err = loadTable(dir, "nums", loaded);
+    assert(err.empty());
+    assert(loaded.allRows()[0].values[0].intValue == maxVal);
+    assert(loaded.allRows()[1].values[0].intValue == minVal);
+    assert(loaded.allRows()[2].values[0].intValue == 0);
+
+    fs::remove_all(dir);
+}
+
 void test_storage_missing_table() {
     std::string dir = "tests/tmp_data/storage_missing";
     fs::remove_all(dir);
@@ -276,6 +320,8 @@ int main() {
 
     RUN(test_parse_create_table);
     RUN(test_parse_create_table_bad_type);
+    RUN(test_parse_create_table_duplicate_column_rejected);
+    RUN(test_parse_tolerates_trailing_semicolon);
     RUN(test_parse_insert);
     RUN(test_parse_select_with_where);
     RUN(test_parse_select_without_where);
@@ -289,6 +335,7 @@ int main() {
     RUN(test_table_delete_where);
 
     RUN(test_storage_round_trip);
+    RUN(test_storage_int64_boundary_values);
     RUN(test_storage_missing_table);
 
     RUN(test_database_end_to_end);

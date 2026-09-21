@@ -54,9 +54,10 @@ std::string Table::selectWhere(const WhereClause& where, std::vector<const Row*>
     if (colIndex < 0) {
         return "error: unknown column '" + where.column + "' on table '" + tableName + "'";
     }
-    if (columnDefs[colIndex].type != where.value.type) {
+    size_t colIndexU = static_cast<size_t>(colIndex);
+    if (columnDefs[colIndexU].type != where.value.type) {
         return "error: type mismatch for column '" + where.column + "' (expected " +
-               columnTypeToString(columnDefs[colIndex].type) + ", got " +
+               columnTypeToString(columnDefs[colIndexU].type) + ", got " +
                columnTypeToString(where.value.type) + ")";
     }
 
@@ -81,16 +82,17 @@ std::string Table::deleteWhere(const WhereClause& where, size_t& outDeletedCount
     if (colIndex < 0) {
         return "error: unknown column '" + where.column + "' on table '" + tableName + "'";
     }
-    if (columnDefs[colIndex].type != where.value.type) {
+    size_t colIndexU = static_cast<size_t>(colIndex);
+    if (columnDefs[colIndexU].type != where.value.type) {
         return "error: type mismatch for column '" + where.column + "' (expected " +
-               columnTypeToString(columnDefs[colIndex].type) + ", got " +
+               columnTypeToString(columnDefs[colIndexU].type) + ", got " +
                columnTypeToString(where.value.type) + ")";
     }
 
     size_t before = rows.size();
     rows.erase(std::remove_if(rows.begin(), rows.end(),
                                [&](const Row& row) {
-                                   const Value& cell = row.values[colIndex];
+                                   const Value& cell = row.values[colIndexU];
                                    return (cell.type == ColumnType::INTEGER)
                                               ? (cell.intValue == where.value.intValue)
                                               : (cell.textValue == where.value.textValue);
